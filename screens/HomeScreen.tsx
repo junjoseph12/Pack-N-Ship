@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,10 @@ import {
   ScrollView,
   Image,
   StatusBar,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../App';
@@ -21,19 +22,19 @@ export default function HomeScreen() {
   const [lastName, setLastName] = useState<string>('Last');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [activeDelivery, setActiveDelivery] = useState<any>(null);
+
+  // Animation for pending status
+  const pulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        if (user.user_metadata?.first_name) {
-          setFirstName(user.user_metadata.first_name);
-        }
-        if (user.user_metadata?.last_name) {
-          setLastName(user.user_metadata.last_name);
-        }
+        if (user.user_metadata?.first_name) setFirstName(user.user_metadata.first_name);
+        if (user.user_metadata?.last_name) setLastName(user.user_metadata.last_name);
         if (user.user_metadata?.avatar_url) {
-          console.log("Loading Home Avatar URL:", user.user_metadata.avatar_url); // Check your terminal!
+          console.log("Loading Home Avatar URL:", user.user_metadata.avatar_url);
           setAvatarUrl(user.user_metadata.avatar_url);
         }
       }
@@ -41,25 +42,80 @@ export default function HomeScreen() {
     fetchUser();
   }, []);
 
+  const fetchActiveDelivery = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: userRecord } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('auth_id', user.id)
+      .single();
+    if (!userRecord) return;
+
+    const { data } = await supabase
+      .from('delivery_requests')
+      .select(`
+        *,
+        cargo_profiles(*),
+        pickup_location:locations!delivery_requests_pickup_location_id_fkey(street_address),
+        dropoff_location:locations!delivery_requests_dropoff_location_id_fkey(street_address)
+      `)
+      .eq('sender_id', userRecord.user_id)
+      .eq('delivery_status', 'Pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    setActiveDelivery(data);
+  };
+
+  // Pulsing animation when delivery is pending
+  useEffect(() => {
+    if (activeDelivery?.delivery_status === 'Pending') {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+  }, [activeDelivery?.delivery_status]);
+
+  const cancelDelivery = async (requestId: number) => {
+    await supabase
+      .from('delivery_requests')
+      .update({ delivery_status: 'Cancelled' })
+      .eq('request_id', requestId);
+    setActiveDelivery(null);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchActiveDelivery();
+    }, [])
+  );
+
   const handleSendPackage = () => {
-    // Add tracking functionality here
+    navigation.navigate('ScheduleDelivery');
   };
 
   const handleScheduleDelivery = () => {
-    // Add tracking functionality here
+    navigation.navigate('ActiveDelivery');
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor="#F27024" />
-      
+
       <View style={styles.headerSection}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.profilePicContainer} onPress={() => navigation.navigate('Account')}>
             {avatarUrl && !imageError ? (
-              <Image 
-                source={{ uri: avatarUrl }} 
-                style={styles.profileImage} 
+              <Image
+                source={{ uri: avatarUrl }}
+                style={styles.profileImage}
                 onError={(e) => {
                   console.log('Home Image Load Error:', e.nativeEvent.error);
                   setImageError(true);
@@ -67,8 +123,7 @@ export default function HomeScreen() {
               />
             ) : (
               <Text style={styles.profileInitials}>
-                {firstName.charAt(0)}
-                {lastName.charAt(0)}
+                {firstName.charAt(0)}{lastName.charAt(0)}
               </Text>
             )}
           </TouchableOpacity>
@@ -92,10 +147,10 @@ export default function HomeScreen() {
             </Text>
           </View>
           <View style={styles.bannerImageContainer}>
-            <Image 
-              source={require('../assets/Pack-N-Ship-Packages.png')} 
-              style={styles.bannerImage} 
-              resizeMode="contain" 
+            <Image
+              source={require('../assets/Pack-N-Ship-Packages.png')}
+              style={styles.bannerImage}
+              resizeMode="contain"
             />
           </View>
         </View>
@@ -107,7 +162,7 @@ export default function HomeScreen() {
             </View>
             <View style={styles.cardTextContainer}>
               <Text style={styles.cardTitle}>Sends package now</Text>
-              <Text style={styles.cardSubtitle}>Sends a package and drop-off immediately</Text>
+              <Text style={styles.cardSubtitle}>Start a new delivery immediately</Text>
             </View>
           </TouchableOpacity>
 
@@ -117,10 +172,63 @@ export default function HomeScreen() {
             </View>
             <View style={styles.cardTextContainer}>
               <Text style={styles.cardTitle}>Schedule a Delivery</Text>
-              <Text style={styles.cardSubtitle}>Plan a future date and time for courier pickup of your package.</Text>
+              <Text style={styles.cardSubtitle}>View or manage your active booking</Text>
             </View>
           </TouchableOpacity>
         </View>
+
+        {/* Active Delivery Card with animated status */}
+        {activeDelivery && (
+          <View style={styles.activeCard}>
+            <View style={styles.activeCardHeader}>
+              <Ionicons name="cube-outline" size={18} color="#F27024" />
+              <Text style={styles.activeTitle}>Active Delivery</Text>
+            </View>
+
+            {activeDelivery.delivery_status === 'Pending' && (
+              <View style={styles.statusRow}>
+                <View style={styles.statusDot} />
+                <Animated.Text style={[styles.statusText, { opacity: pulseAnim }]}>
+                  Looking for provider…
+                </Animated.Text>
+              </View>
+            )}
+
+            <Text style={styles.detailText}>
+              <Text style={styles.bold}>Pickup: </Text>
+              {activeDelivery.pickup_location?.street_address ?? '—'}
+            </Text>
+            <Text style={styles.detailText}>
+              <Text style={styles.bold}>Dropoff: </Text>
+              {activeDelivery.dropoff_location?.street_address ?? '—'}
+            </Text>
+            <Text style={styles.detailText}>
+              <Text style={styles.bold}>Scheduled: </Text>
+              {activeDelivery.scheduled_time
+                ? new Date(activeDelivery.scheduled_time).toLocaleString()
+                : 'Not set'}
+            </Text>
+            <Text style={styles.detailText}>
+              <Text style={styles.bold}>Estimated Cost: </Text>
+              P{activeDelivery.estimated_cost ?? '--'}
+            </Text>
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => navigation.navigate('ActiveDelivery')}
+              >
+                <Text style={styles.editBtnText}>Manage</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => cancelDelivery(activeDelivery.request_id)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeading}>Quick Services</Text>
@@ -150,7 +258,7 @@ export default function HomeScreen() {
 
         <View style={[styles.sectionContainer, { paddingBottom: 100 }]}>
           <Text style={styles.sectionHeading}>Recent Deliveries</Text>
-          
+
           <View style={styles.deliveryItem}>
             <View style={styles.deliveryLeft}>
               <View style={[styles.statusIndicator, { backgroundColor: '#10B981' }]} />
@@ -211,10 +319,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     backgroundColor: '#F27024',
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center' },
   profilePicContainer: {
     width: 60,
     height: 60,
@@ -226,21 +331,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#E65A0D',
   },
-  profileImage: {
-    width: 58, // Explicit exact sizing fixes Android invisibility bugs
-    height: 58,
-    borderRadius: 30,
-  },
-  profileInitials: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#F27024',
-  },
+  profileImage: { width: 58, height: 58, borderRadius: 30 },
+  profileInitials: { fontSize: 18, fontWeight: '800', color: '#F27024' },
   headerWelcome: { fontSize: 14, color: '#FFDDC2', fontWeight: '400' },
   headerUsername: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
   notificationIcon: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)',
+    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
   },
   notificationBadge: {
     position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFFFFF',
@@ -248,7 +345,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 40 },
   upperBanner: {
     backgroundColor: '#F27024', flexDirection: 'row', paddingHorizontal: 24, paddingTop: 10, paddingBottom: 24,
-    borderBottomLeftRadius: 4, borderBottomRightRadius: 4, marginTop: 0,
+    borderBottomLeftRadius: 4, borderBottomRightRadius: 4,
   },
   bannerTextContainer: { flex: 1.5, justifyContent: 'center' },
   bannerTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', marginBottom: 10, lineHeight: 26 },
@@ -277,6 +374,51 @@ const styles = StyleSheet.create({
   },
   gridIconCircle: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
   gridText: { fontSize: 9, fontWeight: '700', color: '#374151' },
+
+  // Active delivery card
+  activeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F27024',
+    padding: 16,
+    marginHorizontal: 24,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  activeCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  activeTitle: { fontSize: 14, fontWeight: '800', color: '#F27024', marginLeft: 6 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#F27024',
+    marginRight: 6,
+  },
+  statusText: { fontSize: 13, fontWeight: '600', color: '#F27024' },
+  detailText: { fontSize: 12, color: '#374151', marginBottom: 4 },
+  bold: { fontWeight: '600' },
+  buttonRow: { flexDirection: 'row', marginTop: 8 },
+  editBtn: {
+    backgroundColor: '#F27024',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  editBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  cancelBtn: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  cancelBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+
   deliveryItem: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB',
     padding: 12, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB',
