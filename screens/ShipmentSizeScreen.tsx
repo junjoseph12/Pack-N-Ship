@@ -20,9 +20,10 @@ const sizeData = [
 
 export default function ShipmentSizeScreen({ navigation }: any) {
   const { state, dispatch } = useSchedule();
+  const mode = state.mode;
 
   const addItem = (size: 'Small' | 'Medium' | 'Large') => {
-    navigation.navigate('AddItem', { size });
+    navigation.navigate('AddItem', { size, mode });
   };
 
   const removeItem = (id: string) => {
@@ -91,7 +92,14 @@ export default function ShipmentSizeScreen({ navigation }: any) {
             state.items.length === 0 && styles.confirmBtnDisabled,
           ]}
           disabled={state.items.length === 0}
-          onPress={() => navigation.navigate('ScheduleCalendar')}
+          onPress={() => {
+            const currentMode = state.mode || 'sendNow'; // fallback: assume send now if missing
+            if (currentMode === 'sendNow') {
+              navigation.navigate('PickupLocation', { type: 'pickup' });
+            } else {
+              navigation.navigate('ScheduleCalendar');
+            }
+          }}
         >
           <Text style={styles.confirmBtnText}>Confirm</Text>
         </TouchableOpacity>

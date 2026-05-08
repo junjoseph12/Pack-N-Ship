@@ -9,6 +9,7 @@ import { useSchedule } from './ScheduleContext';
 export default function LocationSelectScreen({ route, navigation }: any) {
   const { type, initialCoords } = route.params; // 'pickup' or 'dropoff'
   const { state, dispatch } = useSchedule();
+  const mode = state.mode;
 
   const [region, setRegion] = useState({
     latitude: 14.5995,
@@ -65,10 +66,10 @@ export default function LocationSelectScreen({ route, navigation }: any) {
         initialCoords: markerCoord,
       });
     } else {
-      dispatch({ type: 'SET_DROPOFF_LOCATION', payload: locationInfo });
-      const cost = Math.floor(Math.random() * 30) + 20;
-      dispatch({ type: 'SET_ESTIMATED_COST', payload: cost });
-      navigation.navigate('Booking');
+        dispatch({ type: 'SET_DROPOFF_LOCATION', payload: locationInfo });
+        const cost = Math.floor(Math.random() * 30) + 20;
+        dispatch({ type: 'SET_ESTIMATED_COST', payload: cost });
+        navigation.navigate('Booking', { mode });   // <-- pass mode here
     }
   };
 

@@ -155,29 +155,6 @@ export default function AccountScreen() {
 
         <Text style={styles.versionText}>Pack-N-Go v1.0.0</Text>
       </ScrollView>
-
-      <View style={styles.tabBar}>
-        <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Home')}>
-          <Ionicons name="cube-outline" size={20} color="#6B7280" />
-          <Text style={styles.tabText}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tabItem}>
-          <Ionicons name="time-outline" size={20} color="#6B7280" />
-          <Text style={styles.tabText}>Activity</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tabItem}>
-          <Ionicons name="compass-outline" size={20} color="#6B7280" />
-          <Text style={styles.tabText}>Explore</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tabItem}>
-          <Ionicons name="chatbubble-ellipses-outline" size={20} color="#6B7280" />
-          <Text style={styles.tabText}>Messages</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabItem, styles.tabItemActive]}>
-          <Ionicons name="person" size={20} color="#F27024" />
-          <Text style={[styles.tabText, styles.tabTextActive]}>Account</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
@@ -223,12 +200,4 @@ const styles = StyleSheet.create({
   iconCircle: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   menuText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#374151' },
   versionText: { textAlign: 'center', color: '#9CA3AF', fontSize: 11, fontWeight: '500', marginTop: 10 },
-  tabBar: {
-    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: '#FFFFFF',
-    borderTopWidth: 1, borderColor: '#E5E7EB', paddingVertical: 10, position: 'absolute', bottom: 0, left: 0, right: 0,
-  },
-  tabItem: { alignItems: 'center' },
-  tabItemActive: { },
-  tabText: { fontSize: 9, fontWeight: '600', color: '#6B7280', marginTop: 3 },
-  tabTextActive: { color: '#F27024', fontWeight: '800' },
 });

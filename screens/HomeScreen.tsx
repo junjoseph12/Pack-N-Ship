@@ -1,31 +1,80 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  StatusBar,
-  Animated,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../App';
 import { supabase } from '../lib/supabase';
 
+// Mock recent providers
+const MOCK_PROVIDERS = [
+  {
+    name: 'Jun Joseph Pestaño',
+    vehicle: 'Civic RS Turbo',
+    plate: 'NDA-024',
+    rating: 4.8,
+    completedDeliveries: 12,
+  },
+  {
+    name: 'Maria Santos',
+    vehicle: 'Toyota Vios',
+    plate: 'ABC-123',
+    rating: 4.6,
+    completedDeliveries: 8,
+  },
+  {
+    name: 'FastTrack Logistics',
+    vehicle: 'Van',
+    plate: 'FT-5678',
+    rating: 4.9,
+    completedDeliveries: 25,
+  },
+  {
+    name: 'LBC Express',
+    vehicle: 'Van',
+    plate: 'LBC-456',
+    rating: 4.5,
+    completedDeliveries: 30,
+  },
+];
+
+// Mock completed deliveries for inline display
+const MOCK_COMPLETED = [
+  {
+    request_id: 2001,
+    pickup_type: 'Curb-side',
+    estimated_cost: 24.00,
+    scheduled_time: '2026-04-20T15:30:00',
+    pickup_location: { street_address: 'IT Park, Lahug, Cebu City' },
+    dropoff_location: { street_address: 'Ayala Center Cebu' },
+  },
+  {
+    request_id: 2002,
+    pickup_type: 'Door-to-door',
+    estimated_cost: 36.50,
+    scheduled_time: '2026-04-18T09:00:00',
+    pickup_location: { street_address: 'SM Seaside City Cebu' },
+    dropoff_location: { street_address: 'Mactan Airport, Lapu-Lapu City' },
+  },
+  {
+    request_id: 2003,
+    pickup_type: 'Curb-side',
+    estimated_cost: 18.75,
+    scheduled_time: '2026-04-15T11:00:00',
+    pickup_location: { street_address: 'Basilica del Santo Niño, Cebu City' },
+    dropoff_location: { street_address: 'Temple of Leah, Cebu City' },
+  },
+];
+
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [firstName, setFirstName] = useState<string>('First');
-  const [lastName, setLastName] = useState<string>('Last');
+  const [firstName, setFirstName] = useState('First');
+  const [lastName, setLastName] = useState('Last');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
-  const [activeDelivery, setActiveDelivery] = useState<any>(null);
-
-  // Animation for pending status
-  const pulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -33,98 +82,27 @@ export default function HomeScreen() {
       if (user) {
         if (user.user_metadata?.first_name) setFirstName(user.user_metadata.first_name);
         if (user.user_metadata?.last_name) setLastName(user.user_metadata.last_name);
-        if (user.user_metadata?.avatar_url) {
-          console.log("Loading Home Avatar URL:", user.user_metadata.avatar_url);
-          setAvatarUrl(user.user_metadata.avatar_url);
-        }
+        if (user.user_metadata?.avatar_url) setAvatarUrl(user.user_metadata.avatar_url);
       }
     };
     fetchUser();
   }, []);
 
-  const fetchActiveDelivery = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: userRecord } = await supabase
-      .from('users')
-      .select('user_id')
-      .eq('auth_id', user.id)
-      .single();
-    if (!userRecord) return;
-
-    const { data } = await supabase
-      .from('delivery_requests')
-      .select(`
-        *,
-        cargo_profiles(*),
-        pickup_location:locations!delivery_requests_pickup_location_id_fkey(street_address),
-        dropoff_location:locations!delivery_requests_dropoff_location_id_fkey(street_address)
-      `)
-      .eq('sender_id', userRecord.user_id)
-      .eq('delivery_status', 'Pending')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    setActiveDelivery(data);
-  };
-
-  // Pulsing animation when delivery is pending
-  useEffect(() => {
-    if (activeDelivery?.delivery_status === 'Pending') {
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
-        ])
-      );
-      loop.start();
-      return () => loop.stop();
-    }
-  }, [activeDelivery?.delivery_status]);
-
-  const cancelDelivery = async (requestId: number) => {
-    await supabase
-      .from('delivery_requests')
-      .update({ delivery_status: 'Cancelled' })
-      .eq('request_id', requestId);
-    setActiveDelivery(null);
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchActiveDelivery();
-    }, [])
-  );
-
-  const handleSendPackage = () => {
-    navigation.navigate('ScheduleDelivery');
-  };
-
-  const handleScheduleDelivery = () => {
-    navigation.navigate('ActiveDelivery');
-  };
+  const handleSendPackage = () => navigation.navigate('ScheduleDelivery', { mode: 'sendNow' } as never);
+  const handleScheduleDelivery = () => navigation.navigate('ScheduleDelivery', { mode: 'schedule' } as never);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor="#F27024" />
 
+      {/* Header */}
       <View style={styles.headerSection}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.profilePicContainer} onPress={() => navigation.navigate('Account')}>
             {avatarUrl && !imageError ? (
-              <Image
-                source={{ uri: avatarUrl }}
-                style={styles.profileImage}
-                onError={(e) => {
-                  console.log('Home Image Load Error:', e.nativeEvent.error);
-                  setImageError(true);
-                }}
-              />
+              <Image source={{ uri: avatarUrl }} style={styles.profileImage} onError={() => setImageError(true)} />
             ) : (
-              <Text style={styles.profileInitials}>
-                {firstName.charAt(0)}{lastName.charAt(0)}
-              </Text>
+              <Text style={styles.profileInitials}>{firstName.charAt(0)}{lastName.charAt(0)}</Text>
             )}
           </TouchableOpacity>
           <View>
@@ -133,36 +111,30 @@ export default function HomeScreen() {
           </View>
         </View>
         <TouchableOpacity style={styles.notificationIcon}>
-          <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
+          <Ionicons name="notifications-outline" size={22} color="#FFF" />
           <View style={styles.notificationBadge} />
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Banner */}
         <View style={styles.upperBanner}>
           <View style={styles.bannerTextContainer}>
             <Text style={styles.bannerTitle}>Ship Your Packages with Confidence</Text>
-            <Text style={styles.bannerSubtitle}>
-              We make sure your packages arrive safely, on time, and without worries.
-            </Text>
+            <Text style={styles.bannerSubtitle}>Fast, secure, and hassle-free delivery.</Text>
           </View>
-          <View style={styles.bannerImageContainer}>
-            <Image
-              source={require('../assets/Pack-N-Ship-Packages.png')}
-              style={styles.bannerImage}
-              resizeMode="contain"
-            />
-          </View>
+          <Image source={require('../assets/Pack-N-Ship-Packages.png')} style={styles.bannerImage} resizeMode="contain" />
         </View>
 
+        {/* Action Buttons */}
         <View style={styles.contentContainer}>
           <TouchableOpacity style={styles.card} onPress={handleSendPackage}>
             <View style={styles.cardIconContainer}>
               <Ionicons name="cube-outline" size={32} color="#000" />
             </View>
             <View style={styles.cardTextContainer}>
-              <Text style={styles.cardTitle}>Sends package now</Text>
-              <Text style={styles.cardSubtitle}>Start a new delivery immediately</Text>
+              <Text style={styles.cardTitle}>Send Package Now</Text>
+              <Text style={styles.cardSubtitle}>Instant booking & tracking</Text>
             </View>
           </TouchableOpacity>
 
@@ -172,139 +144,85 @@ export default function HomeScreen() {
             </View>
             <View style={styles.cardTextContainer}>
               <Text style={styles.cardTitle}>Schedule a Delivery</Text>
-              <Text style={styles.cardSubtitle}>View or manage your active booking</Text>
+              <Text style={styles.cardSubtitle}>Plan for a future date</Text>
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Active Delivery Card with animated status */}
-        {activeDelivery && (
-          <View style={styles.activeCard}>
-            <View style={styles.activeCardHeader}>
-              <Ionicons name="cube-outline" size={18} color="#F27024" />
-              <Text style={styles.activeTitle}>Active Delivery</Text>
-            </View>
-
-            {activeDelivery.delivery_status === 'Pending' && (
-              <View style={styles.statusRow}>
-                <View style={styles.statusDot} />
-                <Animated.Text style={[styles.statusText, { opacity: pulseAnim }]}>
-                  Looking for provider…
-                </Animated.Text>
-              </View>
-            )}
-
-            <Text style={styles.detailText}>
-              <Text style={styles.bold}>Pickup: </Text>
-              {activeDelivery.pickup_location?.street_address ?? '—'}
-            </Text>
-            <Text style={styles.detailText}>
-              <Text style={styles.bold}>Dropoff: </Text>
-              {activeDelivery.dropoff_location?.street_address ?? '—'}
-            </Text>
-            <Text style={styles.detailText}>
-              <Text style={styles.bold}>Scheduled: </Text>
-              {activeDelivery.scheduled_time
-                ? new Date(activeDelivery.scheduled_time).toLocaleString()
-                : 'Not set'}
-            </Text>
-            <Text style={styles.detailText}>
-              <Text style={styles.bold}>Estimated Cost: </Text>
-              P{activeDelivery.estimated_cost ?? '--'}
-            </Text>
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={styles.editBtn}
-                onPress={() => navigation.navigate('ActiveDelivery')}
-              >
-                <Text style={styles.editBtnText}>Manage</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => cancelDelivery(activeDelivery.request_id)}
-              >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeading}>Quick Services</Text>
-          <View style={styles.gridContainer}>
-            <TouchableOpacity style={styles.gridCard}>
-              <View style={[styles.gridIconCircle, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="calculator-outline" size={24} color="#D97706" />
-              </View>
-              <Text style={styles.gridText}>Calculate Rate</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.gridCard}>
-              <View style={[styles.gridIconCircle, { backgroundColor: '#D1FAE5' }]}>
-                <Ionicons name="scan-outline" size={24} color="#059669" />
-              </View>
-              <Text style={styles.gridText}>Scan QR Code</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.gridCard}>
-              <View style={[styles.gridIconCircle, { backgroundColor: '#DBEAFE' }]}>
-                <Ionicons name="location-outline" size={24} color="#2563EB" />
-              </View>
-              <Text style={styles.gridText}>Drop-off Points</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Quick access buttons */}
+        <View style={styles.deliveryButtonsContainer}>
+          <TouchableOpacity style={styles.deliveryBtn} onPress={() => navigation.navigate('ActiveDeliveries')}>
+            <Ionicons name="car-sport-outline" size={24} color="#FFF" />
+            <Text style={styles.deliveryBtnText}>Active Deliveries</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deliveryBtnOutline} onPress={() => navigation.navigate('ScheduledDeliveries')}>
+            <Ionicons name="calendar-outline" size={24} color="#F27024" />
+            <Text style={styles.deliveryBtnOutlineText}>Scheduled Deliveries</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={[styles.sectionContainer, { paddingBottom: 100 }]}>
-          <Text style={styles.sectionHeading}>Recent Deliveries</Text>
-
-          <View style={styles.deliveryItem}>
-            <View style={styles.deliveryLeft}>
-              <View style={[styles.statusIndicator, { backgroundColor: '#10B981' }]} />
-              <View>
-                <Text style={styles.deliveryTitle}>#PNS-92841-A</Text>
-                <Text style={styles.deliverySubtitle}>Delivered • To Quezon City</Text>
+        {/* Inline Completed Deliveries (mock) */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeading}>Completed Deliveries</Text>
+          {MOCK_COMPLETED.map((item) => (
+            <View key={item.request_id} style={styles.completedCard}>
+              <View style={styles.completedHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                  <Text style={styles.deliveryId}>#{item.request_id}</Text>
+                </View>
+                <Text style={styles.deliveryType}>{item.pickup_type}</Text>
+              </View>
+              <View style={styles.routeRow}>
+                <Ionicons name="location-outline" size={12} color="#3B82F6" />
+                <Text style={styles.addressText}>{item.pickup_location?.street_address}</Text>
+              </View>
+              <Ionicons name="arrow-down" size={12} color="#D1D5DB" style={{ marginLeft: 10, marginVertical: 2 }} />
+              <View style={styles.routeRow}>
+                <Ionicons name="location-outline" size={12} color="#EF4444" />
+                <Text style={styles.addressText}>{item.dropoff_location?.street_address}</Text>
+              </View>
+              <View style={styles.completedFooter}>
+                <Text style={styles.dateText}>{new Date(item.scheduled_time).toLocaleDateString()}</Text>
+                <Text style={styles.costText}>₱{item.estimated_cost.toFixed(2)}</Text>
               </View>
             </View>
-            <Text style={styles.deliveryDate}>May 06</Text>
-          </View>
+          ))}
+        </View>
 
-          <View style={styles.deliveryItem}>
-            <View style={styles.deliveryLeft}>
-              <View style={[styles.statusIndicator, { backgroundColor: '#F59E0B' }]} />
-              <View>
-                <Text style={styles.deliveryTitle}>#PNS-82749-B</Text>
-                <Text style={styles.deliverySubtitle}>In-Transit • To Cebu City</Text>
+        {/* Recent Providers */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeading}>Recent Providers</Text>
+          {MOCK_PROVIDERS.map((prov, index) => (
+            <View key={index} style={styles.providerCard}>
+              <View style={styles.providerAvatarLarge}>
+                <Ionicons name="person" size={28} color="#FFFFFF" />
               </View>
+              <View style={styles.providerInfoBlock}>
+                <Text style={styles.providerName}>{prov.name}</Text>
+                <Text style={styles.providerDetail}>
+                  <Ionicons name="car-sport-outline" size={12} color="#6B7280" /> {prov.vehicle} · {prov.plate}
+                </Text>
+                <View style={styles.ratingRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons
+                      key={star}
+                      name={star <= Math.floor(prov.rating) ? 'star' : 'star-outline'}
+                      size={14}
+                      color="#F59E0B"
+                    />
+                  ))}
+                  <Text style={styles.ratingNumber}>{prov.rating}</Text>
+                  <Text style={styles.deliveryCount}> · {prov.completedDeliveries} deliveries</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.callIconBtn}>
+                <Ionicons name="call-outline" size={22} color="#F27024" />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.deliveryDate}>May 04</Text>
-          </View>
+          ))}
         </View>
       </ScrollView>
-
-      <View style={styles.tabBar}>
-        <TouchableOpacity style={[styles.tabItem, styles.tabItemActive]}>
-          <Ionicons name="cube" size={20} color="#F27024" />
-          <Text style={[styles.tabText, styles.tabTextActive]}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tabItem}>
-          <Ionicons name="time-outline" size={20} color="#6B7280" />
-          <Text style={styles.tabText}>Activity</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tabItem}>
-          <Ionicons name="compass-outline" size={20} color="#6B7280" />
-          <Text style={styles.tabText}>Explore</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tabItem}>
-          <Ionicons name="chatbubble-ellipses-outline" size={20} color="#6B7280" />
-          <Text style={styles.tabText}>Messages</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('Account')}>
-          <Ionicons name="person-outline" size={20} color="#6B7280" />
-          <Text style={styles.tabText}>Account</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
@@ -312,24 +230,14 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   headerSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    backgroundColor: '#F27024',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 24, paddingVertical: 20, backgroundColor: '#F27024',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
   profilePicContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-    borderWidth: 2,
-    borderColor: '#E65A0D',
+    width: 60, height: 60, borderRadius: 30, backgroundColor: '#FFF',
+    justifyContent: 'center', alignItems: 'center', marginRight: 10,
+    borderWidth: 2, borderColor: '#E65A0D', overflow: 'hidden',
   },
   profileImage: { width: 58, height: 58, borderRadius: 30 },
   profileInitials: { fontSize: 18, fontWeight: '800', color: '#F27024' },
@@ -337,103 +245,79 @@ const styles = StyleSheet.create({
   headerUsername: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
   notificationIcon: {
     width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  notificationBadge: {
-    position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFFFFF',
-  },
+  notificationBadge: { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFFFFF' },
   scrollContent: { paddingBottom: 40 },
   upperBanner: {
     backgroundColor: '#F27024', flexDirection: 'row', paddingHorizontal: 24, paddingTop: 10, paddingBottom: 24,
     borderBottomLeftRadius: 4, borderBottomRightRadius: 4,
   },
   bannerTextContainer: { flex: 1.5, justifyContent: 'center' },
-  bannerTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', marginBottom: 10, lineHeight: 26 },
-  bannerSubtitle: { color: '#FFFFFF', fontSize: 11, lineHeight: 16, opacity: 0.9 },
-  bannerImageContainer: { flex: 1, justifyContent: 'center', alignItems: 'flex-end' },
-  bannerImage: { width: 220, height: 130, marginRight: -90 },
+  bannerTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', marginBottom: 10 },
+  bannerSubtitle: { color: '#FFFFFF', fontSize: 11, opacity: 0.9 },
+  bannerImage: { width: 120, height: 80, marginRight: -20 },
   contentContainer: { paddingHorizontal: 24, paddingVertical: 20 },
   card: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', borderRadius: 50,
-    paddingVertical: 16, paddingHorizontal: 18, marginBottom: 14, shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
+    paddingVertical: 16, paddingHorizontal: 18, marginBottom: 14, elevation: 3,
   },
-  cardIconContainer: {
-    width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFFFFF', justifyContent: 'center',
-    alignItems: 'center', marginRight: 14,
-  },
+  cardIconContainer: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   cardTextContainer: { flex: 1 },
-  cardTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', marginBottom: 2 },
-  cardSubtitle: { color: '#9CA3AF', fontSize: 9, lineHeight: 13 },
-  sectionContainer: { paddingHorizontal: 24, marginTop: 8 },
-  sectionHeading: { fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 12 },
-  gridContainer: { flexDirection: 'row', justifyContent: 'space-between' },
-  gridCard: {
-    backgroundColor: '#F9FAFB', borderRadius: 14, paddingVertical: 14, alignItems: 'center',
-    width: '31%', borderWidth: 1, borderColor: '#E5E7EB',
+  cardTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  cardSubtitle: { color: '#9CA3AF', fontSize: 11, marginTop: 2 },
+  deliveryButtonsContainer: { paddingHorizontal: 24, marginTop: 12, marginBottom: 16 },
+  deliveryBtn: {
+    backgroundColor: '#F27024', borderRadius: 12, paddingVertical: 16,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
-  gridIconCircle: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  gridText: { fontSize: 9, fontWeight: '700', color: '#374151' },
-
-  // Active delivery card
-  activeCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#F27024',
-    padding: 16,
-    marginHorizontal: 24,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+  deliveryBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15, marginLeft: 8 },
+  deliveryBtnOutline: {
+    borderWidth: 2, borderColor: '#F27024', borderRadius: 12, paddingVertical: 16,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
   },
-  activeCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  activeTitle: { fontSize: 14, fontWeight: '800', color: '#F27024', marginLeft: 6 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#F27024',
-    marginRight: 6,
+  deliveryBtnOutlineText: { color: '#F27024', fontWeight: '800', fontSize: 15, marginLeft: 8 },
+  sectionContainer: { paddingHorizontal: 24, marginTop: 8, paddingBottom: 20 },
+  sectionHeading: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 16 },
+  // Completed deliveries inline cards
+  completedCard: {
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14,
+    marginBottom: 10, borderLeftWidth: 4, borderLeftColor: '#10B981',
+    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
   },
-  statusText: { fontSize: 13, fontWeight: '600', color: '#F27024' },
-  detailText: { fontSize: 12, color: '#374151', marginBottom: 4 },
-  bold: { fontWeight: '600' },
-  buttonRow: { flexDirection: 'row', marginTop: 8 },
-  editBtn: {
-    backgroundColor: '#F27024',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    marginRight: 10,
+  completedHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8,
   },
-  editBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
-  cancelBtn: {
-    backgroundColor: '#EF4444',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 20,
+  deliveryId: { fontSize: 14, fontWeight: '700', color: '#111827', marginLeft: 6 },
+  deliveryType: { fontSize: 11, color: '#6B7280', fontWeight: '600' },
+  routeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  addressText: { fontSize: 12, color: '#374151', marginLeft: 6, flex: 1 },
+  completedFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F3F4F6',
   },
-  cancelBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
-
-  deliveryItem: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB',
-    padding: 12, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB',
+  dateText: { fontSize: 11, color: '#6B7280' },
+  costText: { fontSize: 14, fontWeight: '700', color: '#F27024' },
+  // Recent Providers (improved)
+  providerCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
+    borderRadius: 16, padding: 16, marginBottom: 12,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    borderLeftWidth: 4, borderLeftColor: '#F27024',
   },
-  deliveryLeft: { flexDirection: 'row', alignItems: 'center' },
-  statusIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
-  deliveryTitle: { fontSize: 12, fontWeight: '700', color: '#111827' },
-  deliverySubtitle: { fontSize: 9, color: '#6B7280', marginTop: 2 },
-  deliveryDate: { fontSize: 11, fontWeight: '600', color: '#4B5563' },
-  tabBar: {
-    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: '#FFFFFF',
-    borderTopWidth: 1, borderColor: '#E5E7EB', paddingVertical: 10, position: 'absolute', bottom: 0, left: 0, right: 0,
+  providerAvatarLarge: {
+    width: 56, height: 56, borderRadius: 28, backgroundColor: '#CC5500',
+    justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
-  tabItem: { alignItems: 'center' },
-  tabItemActive: {},
-  tabText: { fontSize: 9, fontWeight: '600', color: '#6B7280', marginTop: 3 },
-  tabTextActive: { color: '#F27024', fontWeight: '800' },
+  providerInfoBlock: { flex: 1 },
+  providerName: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 4 },
+  providerDetail: { fontSize: 12, color: '#6B7280', marginBottom: 4 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center' },
+  ratingNumber: { fontSize: 12, fontWeight: '700', color: '#111827', marginLeft: 4 },
+  deliveryCount: { fontSize: 11, color: '#6B7280', marginLeft: 2 },
+  callIconBtn: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF7ED',
+    justifyContent: 'center', alignItems: 'center', marginLeft: 8,
+    borderWidth: 1, borderColor: '#FED7AA',
+  },
 });

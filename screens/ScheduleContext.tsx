@@ -25,9 +25,19 @@ export interface ScheduleState {
   pickupLocation: LocationInfo | null;
   dropoffLocation: LocationInfo | null;
   estimatedCost: number | null;
+  isEdit?: boolean;
+  mode?: 'sendNow' | 'schedule';
+  editIds?: {
+    requestId: number;
+    cargoId: number;
+    pickupLocId: number;
+    dropoffLocId: number;
+  };
 }
 
 type Action =
+  | { type: 'SET_MODE'; payload: 'sendNow' | 'schedule' }
+  | { type: 'SET_EDIT_DATA'; payload: ScheduleState['editIds'] }
   | { type: 'SET_DROPOFF_TYPE'; payload: DropoffType }
   | { type: 'ADD_ITEM'; payload: ShipmentItem }
   | { type: 'REMOVE_ITEM'; payload: string } // id
@@ -36,7 +46,7 @@ type Action =
   | { type: 'SET_DROPOFF_LOCATION'; payload: LocationInfo }
   | { type: 'SET_ESTIMATED_COST'; payload: number }
   | { type: 'RESET' }
-  | { type: 'SET_INITIAL_STATE', payload: Partial<ScheduleState> & { requestId: number, cargoId: number; pickupLocId: number; dropoffLocId: number } };
+  | { type: 'SET_INITIAL_STATE'; payload: Partial<ScheduleState> };
 
 const initialState: ScheduleState = {
   dropoffType: null,
@@ -45,10 +55,15 @@ const initialState: ScheduleState = {
   pickupLocation: null,
   dropoffLocation: null,
   estimatedCost: null,
+  isEdit: false,
+  mode: undefined,
+  editIds: undefined,
 };
 
 function scheduleReducer(state: ScheduleState, action: Action): ScheduleState {
   switch (action.type) {
+    case 'SET_MODE':
+      return { ...state, mode: action.payload };
     case 'SET_DROPOFF_TYPE':
       return { ...state, dropoffType: action.payload };
     case 'ADD_ITEM':
@@ -65,6 +80,8 @@ function scheduleReducer(state: ScheduleState, action: Action): ScheduleState {
       return { ...state, estimatedCost: action.payload };
     case 'SET_INITIAL_STATE':
       return { ...state, ...action.payload };
+    case 'SET_EDIT_DATA':
+      return { ...state, isEdit: true, editIds: action.payload };
     case 'RESET':
       return initialState;
     default:
