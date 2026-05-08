@@ -71,16 +71,16 @@ export default function ScheduleCalendarScreen({ navigation }: any) {
               key={idx}
               style={[
                 styles.dayCell,
-                day && isSelected(day) && styles.selectedDay,
-                day && isPastDay(day) && styles.pastDay,
+                day != null && isSelected(day) ? styles.selectedDay : undefined,
+                day != null && isPastDay(day) ? styles.pastDay : undefined,
               ]}
-              disabled={!day || isPastDay(day)}
+              disabled={day == null || isPastDay(day)}
               onPress={() => day && handleSelect(day)}
             >
               <Text style={[
                 styles.dayText,
-                day && isSelected(day) && styles.selectedDayText,
-                day && isPastDay(day) && styles.pastDayText,
+                day != null && isSelected(day) ? styles.selectedDayText : undefined,
+                day != null && isPastDay(day) ? styles.pastDayText : undefined,
               ]}>
                 {day || ''}
               </Text>

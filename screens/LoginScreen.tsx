@@ -43,9 +43,9 @@ export default function LoginScreen() {
       if (error) {
         Alert.alert('Login Error', error.message);
       } else {
-        navigation.reset({
+          navigation.reset({
           index: 0,
-          routes: [{ name: 'Home' }],
+          routes: [{ name: 'MainTabs' }],
         });
       }
     } catch (error: any) {
@@ -112,9 +112,9 @@ export default function LoginScreen() {
 
           if (sessionData?.session) {
             setDebugInfo('Session obtained successfully!');
-            navigation.reset({
+              navigation.reset({
               index: 0,
-              routes: [{ name: 'Home' }],
+              routes: [{ name: 'MainTabs' }],
             });
           } else {
             setDebugInfo('No session in response, checking existing session...');
@@ -124,9 +124,9 @@ export default function LoginScreen() {
             
             if (existingSession?.session) {
               setDebugInfo('Found existing session!');
-              navigation.reset({
+                navigation.reset({
                 index: 0,
-                routes: [{ name: 'Home' }],
+                routes: [{ name: 'MainTabs' }],
               });
             } else {
               throw new Error('No session found after Google sign-in');

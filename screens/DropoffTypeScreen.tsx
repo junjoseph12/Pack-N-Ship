@@ -1,17 +1,91 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import OrangeHeader from './OrangeHeader';
 import { useSchedule } from './ScheduleContext';
 
-export default function DropoffTypeScreen({ navigation }: any) {
+
+export default function DropoffTypeScreen({ route, navigation }: any) {
   const { state, dispatch } = useSchedule();
+  const { mode, editData } = route.params || {};
 
   const selectType = (type: 'curb-side' | 'door-to-door') => {
     dispatch({ type: 'SET_DROPOFF_TYPE', payload: type });
     navigation.navigate('ShipmentSize');
   };
+
+  useEffect(() => {
+  if (editData) {
+    // Reconstruct items from cargo_profiles
+    const cargo = editData.cargo_profiles || {};
+    const reconstructedItems: any[] = [];
+
+    // Create one item per box (so the user can see and manage them)
+    for (let i = 0; i < (cargo.small_box_qty || 0); i++) {
+      reconstructedItems.push({
+        id: `edit-small-${i}-${Date.now()}`,
+        size: 'Small',
+        description: cargo.description || 'Small box',
+        photoUri: null,
+        fragile: cargo.is_fragile || false,
+      });
+    }
+    for (let i = 0; i < (cargo.medium_box_qty || 0); i++) {
+      reconstructedItems.push({
+        id: `edit-medium-${i}-${Date.now()}`,
+        size: 'Medium',
+        description: cargo.description || 'Medium box',
+        photoUri: null,
+        fragile: cargo.is_fragile || false,
+      });
+    }
+    for (let i = 0; i < (cargo.large_box_qty || 0); i++) {
+      reconstructedItems.push({
+        id: `edit-large-${i}-${Date.now()}`,
+        size: 'Large',
+        description: cargo.description || 'Large box',
+        photoUri: null,
+        fragile: cargo.is_fragile || false,
+      });
+    }
+
+    dispatch({
+      type: 'SET_INITIAL_STATE',
+      payload: {
+        dropoffType: editData.pickup_type,
+        items: reconstructedItems,
+        scheduledDate: editData.scheduled_time ? new Date(editData.scheduled_time) : null,
+        pickupLocation: {
+          address: editData.pickup_location?.street_address,
+          latitude: editData.pickup_location?.latitude,
+          longitude: editData.pickup_location?.longitude,
+        },
+        dropoffLocation: {
+          address: editData.dropoff_location?.street_address,
+          latitude: editData.dropoff_location?.latitude,
+          longitude: editData.dropoff_location?.longitude,
+        },
+        estimatedCost: editData.estimated_cost,
+      },
+    });
+    dispatch({
+      type: 'SET_EDIT_DATA',
+      payload: {
+        requestId: editData.request_id,
+        cargoId: cargo.cargo_id,
+        pickupLocId: editData.pickup_location.location_id,
+        dropoffLocId: editData.dropoff_location.location_id,
+      },
+    });
+  }
+}, [editData, dispatch]);
+
+useEffect(() => {
+  if (mode) {
+    dispatch({ type: 'SET_MODE', payload: mode });
+  }
+}, [mode]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
