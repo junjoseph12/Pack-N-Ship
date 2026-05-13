@@ -9,8 +9,8 @@ import { useNavigation } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../App';
-import { supabase } from '../lib/supabase';
+import type { RootStackParamList } from '../../App';
+import { supabase } from '../../lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 
 // Essential for handling the redirect back from the browser to Expo Go
@@ -162,7 +162,7 @@ export default function LoginScreen() {
 
             <View style={styles.logoSection}>
               <Image 
-                source={require('../assets/Pack-N-Ship-Logo2.png')} 
+                source={require('../../assets/Pack-N-Ship-Logo2.png')} 
                 style={styles.logoImage} 
                 resizeMode="contain" 
               />
@@ -247,7 +247,7 @@ export default function LoginScreen() {
               disabled={loading}
             >
               <Image 
-                source={require('../assets/google.png')} 
+                source={require('../../assets/google.png')} 
                 style={styles.googleIcon} 
                 resizeMode="contain" 
               />

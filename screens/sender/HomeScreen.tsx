@@ -6,8 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../App';
-import { supabase } from '../lib/supabase';
+import type { RootStackParamList } from '../../App';
+import { supabase } from '../../lib/supabase';
 
 // Mock recent providers
 const MOCK_PROVIDERS = [
@@ -123,7 +123,7 @@ export default function HomeScreen() {
             <Text style={styles.bannerTitle}>Ship Your Packages with Confidence</Text>
             <Text style={styles.bannerSubtitle}>Fast, secure, and hassle-free delivery.</Text>
           </View>
-          <Image source={require('../assets/Pack-N-Ship-Packages.png')} style={styles.bannerImage} resizeMode="contain" />
+          <Image source={require('../../assets/Pack-N-Ship-Packages.png')} style={styles.bannerImage} resizeMode="contain" />
         </View>
 
         {/* Action Buttons */}
@@ -146,18 +146,6 @@ export default function HomeScreen() {
               <Text style={styles.cardTitle}>Schedule a Delivery</Text>
               <Text style={styles.cardSubtitle}>Plan for a future date</Text>
             </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick access buttons */}
-        <View style={styles.deliveryButtonsContainer}>
-          <TouchableOpacity style={styles.deliveryBtn} onPress={() => navigation.navigate('ActiveDeliveries')}>
-            <Ionicons name="car-sport-outline" size={24} color="#FFF" />
-            <Text style={styles.deliveryBtnText}>Active Deliveries</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deliveryBtnOutline} onPress={() => navigation.navigate('ScheduledDeliveries')}>
-            <Ionicons name="calendar-outline" size={24} color="#F27024" />
-            <Text style={styles.deliveryBtnOutlineText}>Scheduled Deliveries</Text>
           </TouchableOpacity>
         </View>
 

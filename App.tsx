@@ -13,9 +13,9 @@ export type RootStackParamList = {
   MainTabs: undefined;
   EditProfile: undefined;
   ScheduleDelivery: undefined;
-  ActiveDeliveries: undefined;
-  ScheduledDeliveries: undefined;
-  CompletedDeliveries: undefined
+  ActiveDeliveries: { status: 'Accepted' | 'Pending' | 'Completed' };
+  ScheduledDeliveries: { status: 'Accepted' | 'Pending' | 'Completed' };
+  CompletedDeliveries: { status: 'Accepted' | 'Pending' | 'Completed' };
 };
 
 export type BottomTabParamList = {
@@ -26,28 +26,39 @@ export type BottomTabParamList = {
   Account: undefined;
 };
 
-import LoadingScreen from './screens/LoadingScreen';
-import LoginScreen from './screens/LoginScreen';
-import RegisterScreen from './screens/RegisterScreen';
-import HomeScreen from './screens/HomeScreen';
-import AccountScreen from './screens/AccountScreen';
-import EditProfileScreen from './screens/EditProfileScreen';
+export type ScheduleFlowParamList = {
+  DropoffType: undefined;
+  ShipmentSize: undefined;
+  AddItem: undefined;
+  ScheduleCalendar: undefined;
+  PickupLocation: undefined;
+  DropoffLocation: undefined;
+  Booking: undefined;
+};
 
-import { ScheduleProvider } from './screens/ScheduleContext';
-import DropoffTypeScreen from './screens/DropoffTypeScreen';
-import ShipmentSizeScreen from './screens/ShipmentSizeScreen';
-import AddItemScreen from './screens/AddItemScreen';
-import ScheduleCalendarScreen from './screens/ScheduleCalendarScreen';
-import LocationSelectScreen from './screens/LocationSelectScreen';
-import BookingScreen from './screens/BookingScreen';
-import DeliveryListScreen from './screens/DeliveryListScreen';
+import LoadingScreen from './screens/sender/LoadingScreen';
+import LoginScreen from './screens/sender/LoginScreen';
+import RegisterScreen from './screens/sender/RegisterScreen';
+import HomeScreen from './screens/sender/HomeScreen';
+import AccountScreen from './screens/sender/AccountScreen';
+import EditProfileScreen from './screens/sender/EditProfileScreen';
 
-import ActivityScreen from './screens/ActivityScreen';
-import ExploreScreen from './screens/ExploreScreen';
-import MessagesScreen from './screens/MessagesScreen';
+import { ScheduleProvider } from './screens/sender/ScheduleContext';
+import DropoffTypeScreen from './screens/sender/DropoffTypeScreen';
+import ShipmentSizeScreen from './screens/sender/ShipmentSizeScreen';
+import AddItemScreen from './screens/sender/AddItemScreen';
+import ScheduleCalendarScreen from './screens/sender/ScheduleCalendarScreen';
+import LocationSelectScreen from './screens/sender/LocationSelectScreen';
+import BookingScreen from './screens/sender/BookingScreen';
+import DeliveryListScreen from './screens/sender/DeliveryListScreen';
+
+import ActivityScreen from './screens/sender/ActivityScreen';
+import ExploreScreen from './screens/sender/ExploreScreen';
+import MessagesScreen from './screens/sender/MessagesScreen';
 
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const ScheduleStack = createNativeStackNavigator<ScheduleFlowParamList>();
 
 // Bottom tab navigator
 function MainTabs() {
@@ -92,15 +103,15 @@ const ScheduleFlowStack = ({ route }: any) => {
   const params = route.params || {};
   return (
     <ScheduleProvider>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="DropoffType" component={DropoffTypeScreen} initialParams={params} />
-        <Stack.Screen name="ShipmentSize" component={ShipmentSizeScreen} />
-        <Stack.Screen name="AddItem" component={AddItemScreen} />
-        <Stack.Screen name="ScheduleCalendar" component={ScheduleCalendarScreen} />
-        <Stack.Screen name="PickupLocation" component={LocationSelectScreen} />
-        <Stack.Screen name="DropoffLocation" component={LocationSelectScreen} />
-        <Stack.Screen name="Booking" component={BookingScreen} />
-      </Stack.Navigator>
+      <ScheduleStack.Navigator screenOptions={{ headerShown: false }}>
+        <ScheduleStack.Screen name="DropoffType" component={DropoffTypeScreen} initialParams={params} />
+        <ScheduleStack.Screen name="ShipmentSize" component={ShipmentSizeScreen} />
+        <ScheduleStack.Screen name="AddItem" component={AddItemScreen} />
+        <ScheduleStack.Screen name="ScheduleCalendar" component={ScheduleCalendarScreen} />
+        <ScheduleStack.Screen name="PickupLocation" component={LocationSelectScreen} />
+        <ScheduleStack.Screen name="DropoffLocation" component={LocationSelectScreen} />
+        <ScheduleStack.Screen name="Booking" component={BookingScreen} />
+      </ScheduleStack.Navigator>
     </ScheduleProvider>
   );
 };

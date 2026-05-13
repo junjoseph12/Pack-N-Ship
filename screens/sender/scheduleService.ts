@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { ScheduleState } from './ScheduleContext';
 
 export async function saveScheduleToDB(state: ScheduleState, mode: 'sendNow' | 'schedule') {

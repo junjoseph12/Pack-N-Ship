@@ -9,8 +9,8 @@ import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../App';
-import { supabase } from '../lib/supabase';
+import type { RootStackParamList } from '../../App';
+import { supabase } from '../../lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function RegisterScreen() {
@@ -122,7 +122,7 @@ export default function RegisterScreen() {
 
             <View style={styles.logoSection}>
               <Image 
-                source={require('../assets/Pack-N-Ship-Logo2.png')} 
+                source={require('../../assets/Pack-N-Ship-Logo2.png')} 
                 style={styles.logoImage} 
                 resizeMode="contain" 
               />

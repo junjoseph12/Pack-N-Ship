@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../App';
+import type { RootStackParamList } from '../../App';
 
 export default function LoadingScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -29,7 +29,7 @@ export default function LoadingScreen() {
         {/* Logo Section */}
         <View style={styles.logoSection}>
           <Image 
-            source={require('../assets/Pack-N-Ship-Logo2.png')} 
+            source={require('../../assets/Pack-N-Ship-Logo2.png')} 
             style={styles.logoImage} 
             resizeMode="contain" 
           />
