@@ -9,8 +9,8 @@ import { useNavigation } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../App';
-import { supabase } from '../lib/supabase';
+import type { RootStackParamList } from '../../App';
+import { supabase } from '../../lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 
 // Essential for handling the redirect back from the browser to Expo Go
@@ -43,9 +43,9 @@ export default function LoginScreen() {
       if (error) {
         Alert.alert('Login Error', error.message);
       } else {
-        navigation.reset({
+          navigation.reset({
           index: 0,
-          routes: [{ name: 'Home' }],
+          routes: [{ name: 'MainTabs' }],
         });
       }
     } catch (error: any) {
@@ -112,9 +112,9 @@ export default function LoginScreen() {
 
           if (sessionData?.session) {
             setDebugInfo('Session obtained successfully!');
-            navigation.reset({
+              navigation.reset({
               index: 0,
-              routes: [{ name: 'Home' }],
+              routes: [{ name: 'MainTabs' }],
             });
           } else {
             setDebugInfo('No session in response, checking existing session...');
@@ -124,9 +124,9 @@ export default function LoginScreen() {
             
             if (existingSession?.session) {
               setDebugInfo('Found existing session!');
-              navigation.reset({
+                navigation.reset({
                 index: 0,
-                routes: [{ name: 'Home' }],
+                routes: [{ name: 'MainTabs' }],
               });
             } else {
               throw new Error('No session found after Google sign-in');
@@ -162,7 +162,7 @@ export default function LoginScreen() {
 
             <View style={styles.logoSection}>
               <Image 
-                source={require('../assets/Pack-N-Ship-Logo2.png')} 
+                source={require('../../assets/Pack-N-Ship-Logo2.png')} 
                 style={styles.logoImage} 
                 resizeMode="contain" 
               />
@@ -247,7 +247,7 @@ export default function LoginScreen() {
               disabled={loading}
             >
               <Image 
-                source={require('../assets/google.png')} 
+                source={require('../../assets/google.png')} 
                 style={styles.googleIcon} 
                 resizeMode="contain" 
               />
