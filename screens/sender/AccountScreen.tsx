@@ -473,12 +473,12 @@ const styles = StyleSheet.create({
     borderColor: '#F3F4F6',
   },
   hCardType: {
-    fontSize: 9,
+    fontSize: 15,
     color: '#6B7280',
     marginBottom: 4,
   },
   hCardDate: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '800',
     color: '#000',
     marginBottom: 16,
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   hAddressMain: {
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '700',
     color: '#000',
     marginBottom: 2,

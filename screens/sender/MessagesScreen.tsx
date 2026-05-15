@@ -210,7 +210,7 @@ export default function MessagesScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   // --- List View Styles ---
   listContainer: { flex: 1, backgroundColor: '#FFFFFF' },
-  listHeader: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
+  listHeader: { paddingHorizontal: 20, paddingTop: 25, paddingBottom: 10 },
   mainTitle: { fontSize: 30, fontWeight: '800', color: '#000', marginBottom: 20 },
   subTitle: { fontSize: 15, color: '#000', fontWeight: '500' },
   chatRow: { 

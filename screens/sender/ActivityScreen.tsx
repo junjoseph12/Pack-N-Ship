@@ -1,61 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { 
+  View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, 
+  Alert, ActivityIndicator, TextInput, Modal, Image 
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { supabase } from '../../lib/supabase';
 import { deleteDelivery } from './scheduleService';
 
-const { width } = Dimensions.get('window');
-
-// Mock data fallback to maintain layout if the database is empty
-const MOCK_DELIVERIES = [
-  {
-    request_id: 'CXV34DA675FAS1',
-    pickup_type: 'Curb-side Drop-off',
-    date: 'April 25, 2026',
-    time: '6:40 PM',
-    pickup_main: 'Landers Superstore Cebu',
-    pickup_sub: 'Skyrise 4 Tower, Geonzon Street, cor V. Padriga Street, Cebu City',
-    dropoff_main: 'Pardo Public Market',
-    dropoff_sub: 'Cebu S Rd, Cebu City',
-    status: 'Scheduled for Pickup',
-    status_time: 'Today, 6:40 PM',
-    provider_name: 'Moises Padriga',
-    price: '30.00',
-    coords: {
-      pickup: { latitude: 10.3289, longitude: 123.9061 },
-      dropoff: { latitude: 10.2833, longitude: 123.8605 }
-    },
-    isMock: true,
-  },
-  {
-    request_id: 'CXV34DA675FAS2',
-    pickup_type: 'Door-to-Door Drop-off',
-    date: 'April 25, 2026',
-    time: '6:20 PM',
-    pickup_main: 'Landers Superstore Cebu',
-    pickup_sub: 'Skyrise 4 Tower, Geonzon Street, cor V. Padriga Street, Cebu City',
-    dropoff_main: 'Naga Rikyo',
-    dropoff_sub: 'Cebu South Road, Barangay Inoburan, City of Naga',
-    status: 'Booking Confirm',
-    status_time: 'Today, 6:30 PM',
-    provider_name: 'Jonel Jumawan',
-    price: '45.00',
-    coords: {
-      pickup: { latitude: 10.3289, longitude: 123.9061 },
-      dropoff: { latitude: 10.2081, longitude: 123.7570 }
-    },
-    isMock: true,
-  }
-];
+const { width, height } = Dimensions.get('window');
 
 export default function ActivityScreen({ navigation }: any) {
-  const [deliveries, setDeliveries] = useState<any[]>(MOCK_DELIVERIES);
+  const [deliveries, setDeliveries] = useState<any[]>([]);
   const [selectedDelivery, setSelectedDelivery] = useState<any | null>(null);
   const [showFullMap, setShowFullMap] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState(''); // New search state
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // State for the Package Detail Modal
+  const [viewingPackage, setViewingPackage] = useState<any | null>(null);
+  
   const insets = useSafeAreaInsets();
 
   const fetchData = async () => {
@@ -63,7 +28,7 @@ export default function ActivityScreen({ navigation }: any) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setDeliveries(MOCK_DELIVERIES);
+        setDeliveries([]);
         setIsLoading(false);
         return;
       }
@@ -75,7 +40,7 @@ export default function ActivityScreen({ navigation }: any) {
         .single();
 
       if (!userRecord) {
-        setDeliveries(MOCK_DELIVERIES);
+        setDeliveries([]);
         setIsLoading(false);
         return;
       }
@@ -94,7 +59,6 @@ export default function ActivityScreen({ navigation }: any) {
         .order('created_at', { ascending: false });
 
       if (active && active.length > 0) {
-        // Map Database Structure to the Visual UI Structure
         const mappedDeliveries = active.map((item: any) => {
           const scheduleDate = item.scheduled_time ? new Date(item.scheduled_time) : new Date(item.created_at);
           
@@ -124,16 +88,16 @@ export default function ActivityScreen({ navigation }: any) {
               pickup: { latitude: item.pickup_location?.latitude || 10.3157, longitude: item.pickup_location?.longitude || 123.8854 },
               dropoff: { latitude: item.dropoff_location?.latitude || 10.3157, longitude: item.dropoff_location?.longitude || 123.8854 }
             },
-            rawData: item // Stored for edit/delete functions
+            rawData: item 
           };
         });
         setDeliveries(mappedDeliveries);
       } else {
-        setDeliveries(MOCK_DELIVERIES);
+        setDeliveries([]);
       }
     } catch (error) {
       console.error(error);
-      setDeliveries(MOCK_DELIVERIES);
+      setDeliveries([]);
     } finally {
       setIsLoading(false);
     }
@@ -144,12 +108,8 @@ export default function ActivityScreen({ navigation }: any) {
     return unsubscribe;
   }, []);
 
-  // --- Functionalities from DeliveryListScreen ---
   const handleEdit = (rawData: any) => {
-    if (!rawData) {
-      Alert.alert('Notice', 'Cannot edit mock data.');
-      return;
-    }
+    if (!rawData) return;
     setSelectedDelivery(null);
     navigation.navigate('ScheduleDelivery', {
       editData: rawData,
@@ -158,10 +118,7 @@ export default function ActivityScreen({ navigation }: any) {
   };
 
   const handleDelete = (rawData: any) => {
-    if (!rawData) {
-      Alert.alert('Notice', 'Cannot delete mock data.');
-      return;
-    }
+    if (!rawData) return;
     Alert.alert(
       'Cancel Delivery',
       'Are you sure you want to cancel and delete this delivery?',
@@ -189,32 +146,23 @@ export default function ActivityScreen({ navigation }: any) {
     );
   };
 
-  // --- Search Filtering Logic ---
   const filteredDeliveries = deliveries.filter((item) => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
 
-    // Check location strings
     const matchPickup = (item.pickup_main + " " + item.pickup_sub).toLowerCase().includes(query);
     const matchDropoff = (item.dropoff_main + " " + item.dropoff_sub).toLowerCase().includes(query);
-    
-    // Check ID or Provider Name
     const matchId = String(item.request_id).toLowerCase().includes(query);
     const matchProvider = String(item.provider_name).toLowerCase().includes(query);
-    
-    // Check Package Description (if real data exists)
     const matchPackage = item.rawData?.cargo_profiles?.description?.toLowerCase().includes(query) || false;
 
     return matchPickup || matchDropoff || matchId || matchProvider || matchPackage;
   });
 
-  // --- Render Functions ---
-
   const renderListView = () => (
     <ScrollView contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false}>
       <Text style={styles.pageTitle}>Active Delivery</Text>
 
-      {/* Search Bar (Mirrors ExploreScreen style) */}
       <View style={styles.searchBar}>
         <Ionicons name="search-outline" size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
         <TextInput
@@ -231,8 +179,10 @@ export default function ActivityScreen({ navigation }: any) {
         <ActivityIndicator size="large" color="#F27024" style={{ marginTop: 50 }} />
       ) : filteredDeliveries.length === 0 ? (
         <View style={styles.noResultsContainer}>
-          <Text style={styles.noResultsText}>No deliveries found matching</Text>
-          <Text style={styles.noResultsQuery}>"{searchQuery}"</Text>
+          <Text style={styles.noResultsText}>
+            {deliveries.length === 0 ? "You have no active deliveries." : "No deliveries found matching"}
+          </Text>
+          {searchQuery ? <Text style={styles.noResultsQuery}>"{searchQuery}"</Text> : null}
         </View>
       ) : (
         filteredDeliveries.map((item, index) => (
@@ -406,121 +356,167 @@ export default function ActivityScreen({ navigation }: any) {
         </View>
       </View>
 
-      {!selectedDelivery.isMock && (
-        <View style={styles.detailActionsRow}>
-          <TouchableOpacity style={styles.editBtn} onPress={() => handleEdit(selectedDelivery.rawData)}>
-            <Ionicons name="create-outline" size={16} color="#FFF" />
-            <Text style={styles.editBtnText}>Edit Details</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(selectedDelivery.rawData)}>
-            <Ionicons name="close-circle-outline" size={16} color="#FFF" />
-            <Text style={styles.deleteBtnText}>Cancel Booking</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <View style={styles.detailActionsRow}>
+        <TouchableOpacity style={styles.editBtn} onPress={() => handleEdit(selectedDelivery.rawData)}>
+          <Ionicons name="create-outline" size={16} color="#FFF" />
+          <Text style={styles.editBtnText}>Edit Details</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(selectedDelivery.rawData)}>
+          <Ionicons name="close-circle-outline" size={16} color="#FFF" />
+          <Text style={styles.deleteBtnText}>Cancel Booking</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 
-  const renderFullMapView = () => (
-    <View style={styles.fullMapContainer}>
-      <MapView
-        style={StyleSheet.absoluteFillObject}
-        initialRegion={{
-          latitude: (selectedDelivery.coords.pickup.latitude + selectedDelivery.coords.dropoff.latitude) / 2,
-          longitude: (selectedDelivery.coords.pickup.longitude + selectedDelivery.coords.dropoff.longitude) / 2,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
-      >
-        <Marker coordinate={selectedDelivery.coords.pickup}>
-          <View style={[styles.blueDot, { width: 16, height: 16, borderRadius: 8 }]}>
-            <View style={[styles.blueDotInner, { width: 6, height: 6, borderRadius: 3 }]} />
-          </View>
-        </Marker>
-        <Marker coordinate={selectedDelivery.coords.dropoff}>
-          <Ionicons name="location" size={28} color="#E11D48" />
-        </Marker>
-        <Polyline
-          coordinates={[selectedDelivery.coords.pickup, selectedDelivery.coords.dropoff]}
-          strokeColor="#0000CC"
-          strokeWidth={4}
-        />
-      </MapView>
+  const renderFullMapView = () => {
+    const cargo = selectedDelivery.rawData?.cargo_profiles || { 
+      description: 'Standard Package', 
+      small_box_qty: 0, 
+      medium_box_qty: 0, 
+      large_box_qty: 0, 
+      is_fragile: false,
+      cargo_pic: null 
+    };
 
-      <View style={[styles.topOverlay, { top: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.backCircleBtn} onPress={() => setShowFullMap(false)}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-      </View>
+    // Reconstruct individual items for the horizontal scroll list
+    const packages = [];
+    for (let i = 0; i < (cargo.small_box_qty || 0); i++) packages.push({ id: `S${i}`, size: 'Small', desc: cargo.description, fragile: cargo.is_fragile, pic: cargo.cargo_pic });
+    for (let i = 0; i < (cargo.medium_box_qty || 0); i++) packages.push({ id: `M${i}`, size: 'Medium', desc: cargo.description, fragile: cargo.is_fragile, pic: cargo.cargo_pic });
+    for (let i = 0; i < (cargo.large_box_qty || 0); i++) packages.push({ id: `L${i}`, size: 'Large', desc: cargo.description, fragile: cargo.is_fragile, pic: cargo.cargo_pic });
+    
+    // Fallback if no packages recorded
+    if (packages.length === 0) {
+      packages.push({ id: 'P1', size: 'Standard', desc: cargo.description, fragile: cargo.is_fragile, pic: cargo.cargo_pic });
+    }
 
-      <View style={[styles.bottomSheet, { paddingBottom: insets.bottom + 20 }]}>
-        <View style={styles.sheetCardMatched}>
-          <Text style={styles.matchedDropType}>{selectedDelivery.pickup_type}</Text>
-          
-          <View style={styles.matchedInnerCard}>
-            <View style={styles.matchedRow}>
-              <View style={styles.matchedLeftCol}>
-                <View style={styles.matchedAvatarBox}>
-                  <View style={styles.matchedAvatarCircle}>
-                    <Ionicons name="person" size={32} color="#C2410C" />
-                  </View>
-                  <View style={styles.matchedAvatarLines}>
-                      <View style={styles.placeholderLine} />
-                      <View style={styles.placeholderLineShort} />
-                  </View>
-                </View>
-                <View style={styles.qrCodeBox}>
-                    <Ionicons name="qr-code-outline" size={60} color="#000" />
-                </View>
-              </View>
-
-              <View style={styles.matchedRightCol}>
-                <Text style={styles.matchedName}>{selectedDelivery.provider_name}</Text>
-                
-                <View style={styles.carDetailRow}>
-                  <View style={{flex: 1}}>
-                    <Text style={styles.carText}>Car: Honda Civic RS Turbo</Text>
-                    <Text style={styles.carText}>Color: Sonic Gray Pearl</Text>
-                    <Text style={styles.carText}>Plate Number: NDA-1234</Text>
-                  </View>
-                  <View style={styles.contactIcons}>
-                    <View style={styles.contactIconCircle}><Ionicons name="chatbubbles" size={14} color="#000" /></View>
-                    <View style={styles.contactIconCircle}><Ionicons name="call" size={14} color="#000" /></View>
-                  </View>
-                </View>
-
-                <View style={styles.timelineSmall}>
-                  <View style={styles.timelinePointSmall}>
-                    <View style={[styles.blueDot, { width: 12, height: 12, marginRight: 6 }]}><View style={[styles.blueDotInner, { width: 4, height: 4 }]} /></View>
-                    <View style={{flex: 1}}>
-                      <Text style={styles.timelineMainTextSmall}>{selectedDelivery.pickup_main}</Text>
-                      <Text style={styles.timelineSubTextSmall} numberOfLines={1}>{selectedDelivery.pickup_sub}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.timelineLineSmall} />
-                  <View style={styles.timelinePointSmall}>
-                    <Ionicons name="location" size={14} color="#E11D48" style={{ marginRight: 5, marginLeft: -1 }} />
-                    <View style={{flex: 1}}>
-                      <Text style={styles.timelineMainTextSmall}>{selectedDelivery.dropoff_main}</Text>
-                      <Text style={styles.timelineSubTextSmall} numberOfLines={1}>{selectedDelivery.dropoff_sub}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <Text style={styles.scheduledForText}>Scheduled for:</Text>
-                <Text style={styles.scheduledTimeText}>{selectedDelivery.date}  {selectedDelivery.time}</Text>
-
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Total</Text>
-                  <Text style={styles.totalValue}>₱{selectedDelivery.price}</Text>
-                </View>
-              </View>
+    return (
+      <View style={styles.fullMapContainer}>
+        <MapView
+          style={StyleSheet.absoluteFillObject}
+          initialRegion={{
+            latitude: (selectedDelivery.coords.pickup.latitude + selectedDelivery.coords.dropoff.latitude) / 2,
+            longitude: (selectedDelivery.coords.pickup.longitude + selectedDelivery.coords.dropoff.longitude) / 2,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
+        >
+          <Marker coordinate={selectedDelivery.coords.pickup}>
+            <View style={[styles.blueDot, { width: 16, height: 16, borderRadius: 8 }]}>
+              <View style={[styles.blueDotInner, { width: 6, height: 6, borderRadius: 3 }]} />
             </View>
+          </Marker>
+          <Marker coordinate={selectedDelivery.coords.dropoff}>
+            <Ionicons name="location" size={28} color="#E11D48" />
+          </Marker>
+          <Polyline
+            coordinates={[selectedDelivery.coords.pickup, selectedDelivery.coords.dropoff]}
+            strokeColor="#0000CC"
+            strokeWidth={4}
+          />
+        </MapView>
+
+        <View style={[styles.topOverlay, { top: insets.top + 10 }]}>
+          <TouchableOpacity style={styles.backCircleBtn} onPress={() => setShowFullMap(false)}>
+            <Ionicons name="arrow-back" size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.bottomSheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.sheetCardMatched}>
+            <Text style={styles.matchedDropType}>{selectedDelivery.pickup_type}</Text>
+            
+            <ScrollView style={{ maxHeight: height * 0.55 }} showsVerticalScrollIndicator={false}>
+              <View style={styles.matchedInnerCard}>
+                <View style={styles.matchedRow}>
+                  <View style={styles.matchedLeftCol}>
+                    <View style={styles.matchedAvatarBox}>
+                      <View style={styles.matchedAvatarCircle}>
+                        <Ionicons name="person" size={32} color="#C2410C" />
+                      </View>
+                      <View style={styles.matchedAvatarLines}>
+                          <View style={styles.placeholderLine} />
+                          <View style={styles.placeholderLineShort} />
+                      </View>
+                    </View>
+                    <View style={styles.qrCodeBox}>
+                        <Ionicons name="qr-code-outline" size={60} color="#000" />
+                    </View>
+                  </View>
+
+                  <View style={styles.matchedRightCol}>
+                    <Text style={styles.matchedName}>{selectedDelivery.provider_name}</Text>
+                    
+                    <View style={styles.carDetailRow}>
+                      <View style={{flex: 1}}>
+                        <Text style={styles.carText}>Car: Honda Civic RS Turbo</Text>
+                        <Text style={styles.carText}>Color: Sonic Gray Pearl</Text>
+                        <Text style={styles.carText}>Plate Number: NDA-1234</Text>
+                      </View>
+                      <View style={styles.contactIcons}>
+                        <View style={styles.contactIconCircle}><Ionicons name="chatbubbles" size={14} color="#000" /></View>
+                        <View style={styles.contactIconCircle}><Ionicons name="call" size={14} color="#000" /></View>
+                      </View>
+                    </View>
+
+                    <View style={styles.timelineSmall}>
+                      <View style={styles.timelinePointSmall}>
+                        <View style={[styles.blueDot, { width: 12, height: 12, marginRight: 6 }]}><View style={[styles.blueDotInner, { width: 4, height: 4 }]} /></View>
+                        <View style={{flex: 1}}>
+                          <Text style={styles.timelineMainTextSmall}>{selectedDelivery.pickup_main}</Text>
+                          <Text style={styles.timelineSubTextSmall} numberOfLines={1}>{selectedDelivery.pickup_sub}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.timelineLineSmall} />
+                      <View style={styles.timelinePointSmall}>
+                        <Ionicons name="location" size={14} color="#E11D48" style={{ marginRight: 5, marginLeft: -1 }} />
+                        <View style={{flex: 1}}>
+                          <Text style={styles.timelineMainTextSmall}>{selectedDelivery.dropoff_main}</Text>
+                          <Text style={styles.timelineSubTextSmall} numberOfLines={1}>{selectedDelivery.dropoff_sub}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <Text style={styles.scheduledForText}>Scheduled for:</Text>
+                    <Text style={styles.scheduledTimeText}>{selectedDelivery.date}  {selectedDelivery.time}</Text>
+
+                    <View style={styles.totalRow}>
+                      <Text style={styles.totalLabel}>Total</Text>
+                      <Text style={styles.totalValue}>₱{selectedDelivery.price}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* HORIZONTAL PACKAGE LIST SECTION */}
+              <View style={styles.packageSection}>
+                <Text style={styles.packageSectionTitle}>Shipment Items ({packages.length})</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingLeft: 4 }}>
+                  {packages.map((pkg, idx) => (
+                    <TouchableOpacity 
+                      key={pkg.id} 
+                      style={styles.pkgCard} 
+                      onPress={() => setViewingPackage(pkg)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="cube-outline" size={32} color="#9CA3AF" />
+                      <Text style={styles.pkgSizeText}>{pkg.size} Box</Text>
+                      {pkg.fragile && (
+                        <View style={styles.pkgFragileIndicator}>
+                          <View style={styles.redDot} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+              
+            </ScrollView>
           </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={showFullMap ? [] : ['top']}>
@@ -529,6 +525,53 @@ export default function ActivityScreen({ navigation }: any) {
         : selectedDelivery 
           ? renderDetailView() 
           : renderListView()}
+
+      {/* PACKAGE DETAIL MODAL */}
+      <Modal
+        visible={!!viewingPackage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setViewingPackage(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setViewingPackage(null)} />
+          <View style={styles.pkgModalCard}>
+            
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setViewingPackage(null)}>
+              <Ionicons name="close" size={24} color="#111827" />
+            </TouchableOpacity>
+
+            {/* Package Image or Placeholder */}
+            {viewingPackage?.pic ? (
+              <Image source={{ uri: viewingPackage.pic }} style={styles.pkgModalImg} />
+            ) : (
+              <View style={styles.pkgModalImgPlaceholder}>
+                <Ionicons name="image-outline" size={48} color="#D1D5DB" />
+                <Text style={styles.pkgModalImgText}>No photo provided</Text>
+              </View>
+            )}
+
+            {/* Package Details */}
+            <View style={styles.pkgModalInfo}>
+              <View style={styles.pkgModalHeaderRow}>
+                <Text style={styles.pkgModalSize}>{viewingPackage?.size} Item</Text>
+                {viewingPackage?.fragile && (
+                  <View style={styles.fragileBadge}>
+                    <Ionicons name="warning-outline" size={12} color="#EF4444" />
+                    <Text style={styles.fragileText}>Fragile</Text>
+                  </View>
+                )}
+              </View>
+
+              <Text style={styles.pkgModalDescTitle}>Description</Text>
+              <Text style={styles.pkgModalDesc}>
+                {viewingPackage?.desc || 'No description provided.'}
+              </Text>
+            </View>
+
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -566,7 +609,7 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingHorizontal: 16,
     paddingBottom: 30,
-    paddingTop: 10,
+    paddingTop: 25
   },
   pageTitle: { 
     fontSize: 30, 
@@ -603,14 +646,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginTop: 4,
+    marginTop: 20,
   },
   card: {
     backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 16,
-    top: 30,
-    marginBottom: 16,
+    marginTop: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -689,12 +731,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  editBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-    marginLeft: 6,
-  },
+  editBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14, marginLeft: 6 },
   deleteBtn: {
     backgroundColor: '#EF4444',
     paddingVertical: 14,
@@ -709,21 +746,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  deleteBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-    marginLeft: 6,
-  },
+  deleteBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14, marginLeft: 6 },
 
   // --- Full Map View Styles ---
   fullMapContainer: { flex: 1 },
   topOverlay: { position: 'absolute', left: 20, zIndex: 10 },
   backCircleBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 4 },
-  bottomSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center' },
-  sheetCardMatched: { width: '100%', backgroundColor: '#FFF', padding: 20, bottom: -20},
+  bottomSheet: { position: 'absolute', bottom: -20, left: 0, right: 0, alignItems: 'center'},
+  sheetCardMatched: { width: '100%', backgroundColor: '#FFF', padding: 20, paddingBottom: 0 },
   matchedDropType: { fontSize: 11, color: '#000', marginBottom: 12 },
-  matchedInnerCard: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16 },
+  matchedInnerCard: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, marginBottom: 12 },
   matchedRow: { flexDirection: 'row' },
   matchedLeftCol: { width: '35%', alignItems: 'center', marginRight: 16 },
   matchedAvatarBox: { width: '100%', backgroundColor: '#FDBA74', borderRadius: 8, padding: 10, alignItems: 'center', marginBottom: 10 },
@@ -748,4 +780,145 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalLabel: { fontSize: 11, color: '#000' },
   totalValue: { fontSize: 13, fontWeight: '700', color: '#000' },
+
+  // --- Horizontal Packages Section ---
+  packageSection: {
+    marginTop: 10,
+    marginBottom: 30,
+  },
+  packageSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  pkgCard: {
+    width: 90,
+    height: 100,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  pkgSizeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 8,
+  },
+  pkgFragileIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#FEE2E2',
+    padding: 4,
+    borderRadius: 10,
+  },
+  redDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EF4444',
+  },
+
+  // --- Package Details Modal ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  pkgModalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 20,
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  pkgModalImg: {
+    width: '100%',
+    height: 220,
+    resizeMode: 'cover',
+  },
+  pkgModalImgPlaceholder: {
+    width: '100%',
+    height: 220,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pkgModalImgText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  pkgModalInfo: {
+    padding: 24,
+  },
+  pkgModalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  pkgModalSize: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  fragileBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  fragileText: {
+    color: '#EF4444',
+    fontWeight: '700',
+    fontSize: 11,
+    marginLeft: 4,
+  },
+  pkgModalDescTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  pkgModalDesc: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 22,
+  },
 });

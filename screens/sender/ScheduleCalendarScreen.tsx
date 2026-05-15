@@ -1,12 +1,23 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions } from 'react-native';
+import { 
+  View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, Modal, ScrollView 
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSchedule } from './ScheduleContext';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// Generate 30-minute interval time slots for the custom picker
+const TIME_SLOTS = [
+  '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+  '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM',
+  '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
+  '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM',
+  '08:00 PM'
+];
 
 export default function ScheduleCalendarScreen({ navigation }: any) {
   const { state, dispatch } = useSchedule();
@@ -15,7 +26,15 @@ export default function ScheduleCalendarScreen({ navigation }: any) {
   
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth()); // 0-indexed
-  const [selectedDate, setSelectedDate] = useState<Date | null>(state.scheduledDate);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(state.scheduledDate || today);
+
+  // Initialize time state from global context or default to 10:00 AM
+  const initialTime = state.scheduledDate 
+    ? state.scheduledDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    : '10:00 AM';
+    
+  const [selectedTime, setSelectedTime] = useState<string>(initialTime);
+  const [showTimeModal, setShowTimeModal] = useState(false);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay();
@@ -45,15 +64,25 @@ export default function ScheduleCalendarScreen({ navigation }: any) {
   };
 
   const goNext = () => {
-    if (selectedDate) {
-      dispatch({ type: 'SET_SCHEDULED_DATE', payload: selectedDate });
+    if (selectedDate && selectedTime) {
+      // Parse the custom time string back into the Date object
+      const [timeStr, period] = selectedTime.split(' ');
+      let [hours, minutes] = timeStr.split(':').map(Number);
+      
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+
+      const finalDate = new Date(selectedDate);
+      finalDate.setHours(hours, minutes, 0, 0);
+
+      dispatch({ type: 'SET_SCHEDULED_DATE', payload: finalDate });
       navigation.navigate('PickupLocation', { type: 'pickup' });
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Custom Orange Header matching other screens */}
+      {/* Custom Orange Header */}
       <View style={[styles.headerBackground, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -78,7 +107,6 @@ export default function ScheduleCalendarScreen({ navigation }: any) {
           
           {/* Card Title */}
           <View style={styles.cardTitleRow}>
-            {/* Using the package icon tinted orange as a placeholder */}
             <Image 
               source={require('../../assets/package-sizes.png')} 
               style={[styles.titleIcon, { tintColor: '#F59E0B' }]} 
@@ -146,7 +174,6 @@ export default function ScheduleCalendarScreen({ navigation }: any) {
                 </View>
               ))}
               
-              {/* Render trailing empty days to keep grid perfect */}
               {Array.from({ length: trailingDays }).map((_, idx) => (
                 <View key={`trail-${idx}`} style={styles.dayCellContainer}>
                   <View style={styles.dayCell}>
@@ -157,20 +184,29 @@ export default function ScheduleCalendarScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Bottom Actions */}
+          {/* Bottom Actions Row (Now displays selected date/time) */}
           <View style={styles.actionLinksRow}>
-            <TouchableOpacity>
-              <Text style={styles.actionLinkText}>Change Date</Text>
-            </TouchableOpacity>
-            <TouchableOpacity>
-              <Text style={styles.actionLinkText}>Change Time</Text>
-            </TouchableOpacity>
+            <View style={styles.actionColLeft}>
+              <Text style={styles.selectedValText}>
+                {selectedDate ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'None'}
+              </Text>
+              <TouchableOpacity>
+                <Text style={styles.actionLinkText}>Change Date</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.actionColRight}>
+              <Text style={styles.selectedValText}>{selectedTime}</Text>
+              <TouchableOpacity onPress={() => setShowTimeModal(true)}>
+                <Text style={styles.actionLinkText}>Change Time</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Next Button */}
           <TouchableOpacity
-            style={[styles.nextBtn, !selectedDate && styles.disabledBtn]}
-            disabled={!selectedDate}
+            style={[styles.nextBtn, (!selectedDate || !selectedTime) && styles.disabledBtn]}
+            disabled={!selectedDate || !selectedTime}
             onPress={goNext}
             activeOpacity={0.8}
           >
@@ -178,6 +214,50 @@ export default function ScheduleCalendarScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* --- TIME SELECTION MODAL --- */}
+      <Modal
+        visible={showTimeModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowTimeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowTimeModal(false)} />
+          <View style={[styles.timeModalContent, { paddingBottom: insets.bottom + 20 }]}>
+            
+            <View style={styles.timeModalHeader}>
+              <Text style={styles.timeModalTitle}>Select Delivery Time</Text>
+              <TouchableOpacity onPress={() => setShowTimeModal(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.timeScroll} showsVerticalScrollIndicator={false}>
+              {TIME_SLOTS.map((time) => (
+                <TouchableOpacity
+                  key={time}
+                  style={[styles.timeSlot, selectedTime === time && styles.timeSlotActive]}
+                  onPress={() => {
+                    setSelectedTime(time);
+                    setShowTimeModal(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.timeSlotText, selectedTime === time && styles.timeSlotTextActive]}>
+                    {time}
+                  </Text>
+                  {selectedTime === time && (
+                    <Ionicons name="checkmark-circle" size={20} color="#FA7A25" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -265,7 +345,7 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   monthSelectorRow: {
     flexDirection: 'row',
@@ -310,7 +390,7 @@ const styles = StyleSheet.create({
   },
   dayCellContainer: {
     width: '14.28%',
-    aspectRatio: 1, // Ensures perfect squares for the grid
+    aspectRatio: 1, 
     justifyContent: 'center',
     alignItems: 'center',
     padding: 2,
@@ -341,16 +421,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // Action Links
+  // Action Links (Date & Time Display)
   actionLinksRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 10,
     marginBottom: 'auto',
   },
+  actionColLeft: {
+    alignItems: 'flex-start',
+  },
+  actionColRight: {
+    alignItems: 'flex-end',
+  },
+  selectedValText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
   actionLinkText: {
     color: '#FA7A25', // Orange text
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
 
@@ -369,5 +461,64 @@ const styles = StyleSheet.create({
     color: '#FFFFFF', 
     fontWeight: '600', 
     fontSize: 15 
+  },
+
+  // --- Time Modal Styles ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  timeModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    maxHeight: height * 0.6,
+  },
+  timeModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  timeModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  closeBtn: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+    padding: 6,
+  },
+  timeScroll: {
+    marginBottom: 10,
+  },
+  timeSlot: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  timeSlotActive: {
+    backgroundColor: '#FFF8F4',
+    borderColor: '#FED7AA',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1, // overrides row styling for active
+  },
+  timeSlotText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  timeSlotTextActive: {
+    color: '#FA7A25',
+    fontWeight: '700',
   },
 });
